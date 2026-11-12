@@ -195,7 +195,7 @@ pub fn view_window(sizing: crate::ui::modal::ModalSizing) -> Element<'static, Me
         row![
             logo,
             column![
-                text("Open CAD Studio").size(28).style(primary_style),
+                text(crate::smartcad::config().app_name.as_str()).size(28).style(primary_style),
                 text(t!("CAD application for Architecture & Engineering"))
                     .size(11)
                     .style(muted_style),

@@ -245,6 +245,18 @@ debug = 0
 [profile.release]
 strip = true
 
+# SmartCAD: perfil para el preview. Recompila más rápido tras cambios en el
+# crate principal (incremental + más paralelismo + menos optimización en él);
+# las dependencias, ya en caché, siguen con opt-level 3.
+[profile.preview]
+inherits = "release"
+incremental = true
+codegen-units = 256
+opt-level = 1
+
+[profile.preview.package."*"]
+opt-level = 3
+
 [[bench]]
 name = "performance_benchmarks"
 harness = false

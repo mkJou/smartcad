@@ -45,6 +45,7 @@ pub mod plugin;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod rest;
 pub mod scene;
+pub mod smartcad;
 pub(crate) mod schema_validation;
 pub mod snap;
 pub mod sys;

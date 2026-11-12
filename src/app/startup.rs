@@ -15,7 +15,8 @@ impl OpenCADStudio {
         // web host opted in at boot) while control is enabled, the donation
         // prompt is suppressed — a modal would block every automated
         // operation until a client closed it by hand.
-        if self.donation_prompt_version != env!("OCS_APP_VERSION")
+        if crate::smartcad::config().donation_prompt
+            && self.donation_prompt_version != env!("OCS_APP_VERSION")
             && !(self.control.enabled && self.control.automation_seen)
         {
             self.pending_startup_modals

@@ -4454,7 +4454,10 @@ fn start_page_content<'a>(
     active: super::StartSection,
     templates: Option<&'a [std::path::PathBuf]>,
 ) -> Element<'a, Message> {
-    let headline = text("Open CAD Studio").size(40).style(start_primary_style);
+    let smartcad = &crate::smartcad::config().start;
+    let headline = text(crate::smartcad::config().app_name.as_str())
+        .size(40)
+        .style(start_primary_style);
 
     // Plain outlined button (Open / New / Help / Contribute).
     let outline_btn = |label: String, msg: Message| {
@@ -4549,8 +4552,10 @@ fn start_page_content<'a>(
             }
         },
         outline_btn(crate::tr!("start", "open-file"), Message::OpenFile).into(),
-        donate_btn.into(),
-    ])
+    ]
+    .into_iter()
+    .chain(smartcad.show_donate.then(|| donate_btn.into()))
+    .collect())
     .spacing_x(12.0)
     .row_h(48.0)
     .report_natural_width(action_width_out.clone());
@@ -4586,6 +4591,7 @@ fn start_page_content<'a>(
         );
     }
     #[cfg(target_arch = "wasm32")]
+    if smartcad.show_desktop_link {
     secondary_items.push(
         button(text(crate::t!("OCS Desktop")).size(14))
             .on_press(Message::OpenUrl(
@@ -4595,6 +4601,7 @@ fn start_page_content<'a>(
             .style(|theme: &Theme, status| start_action_shape(button::primary(theme, status)))
             .into(),
     );
+    }
     let secondary_row = WrapFlow::new(secondary_items)
         .spacing_x(12.0)
         .row_h(44.0)
@@ -4654,19 +4661,28 @@ fn start_page_content<'a>(
     .align_x(iced::alignment::Horizontal::Center)
     .width(Fill);
 
-    let content = column![
-        Space::new().height(iced::Length::Fixed(28.0)),
-        container(headline).center_x(Fill),
-        Space::new().height(iced::Length::Fixed(22.0)),
-        container(primary_row).center_x(Fill),
-        Space::new().height(iced::Length::Fixed(10.0)),
-        container(secondary_row).center_x(Fill),
-        Space::new().height(iced::Length::Fixed(10.0)),
-        container(reddit_btn).center_x(Fill),
-        Space::new().height(iced::Length::Fixed(20.0)),
-        sponsors,
-        Space::new().height(iced::Length::Fixed(52.0)),
-    ]
+    let mut content = column![Space::new().height(iced::Length::Fixed(28.0))];
+    if smartcad.show_title {
+        content = content
+            .push(container(headline).center_x(Fill))
+            .push(Space::new().height(iced::Length::Fixed(22.0)));
+    }
+    content = content
+        .push(container(primary_row).center_x(Fill))
+        .push(Space::new().height(iced::Length::Fixed(10.0)))
+        .push(container(secondary_row).center_x(Fill));
+    if smartcad.show_reddit {
+        content = content
+            .push(Space::new().height(iced::Length::Fixed(10.0)))
+            .push(container(reddit_btn).center_x(Fill));
+    }
+    if smartcad.show_sponsors {
+        content = content
+            .push(Space::new().height(iced::Length::Fixed(20.0)))
+            .push(sponsors);
+    }
+    let content = content
+        .push(Space::new().height(iced::Length::Fixed(52.0)))
     .spacing(0)
     .width(Fill)
     .height(Fill);
@@ -4689,7 +4705,13 @@ fn start_page_content<'a>(
     let welcome_wide_min = measured_action_w.max(360.0);
     let avail = (avail_w - 16.0).max(0.0); // minus the page's l/r padding
     let panel_widths = [panel_w; 4];
-    let mut panel_visible = [true, true, true, true];
+    // SmartCAD: paneles opcionales (Recientes siempre).
+    let mut panel_visible = [
+        true,
+        smartcad.show_videos,
+        smartcad.show_discussions,
+        smartcad.show_supporters,
+    ];
     let required_width = |visible: &[bool; 4]| {
         let visible_panels = visible.iter().filter(|&&shown| shown).count();
         welcome_wide_min
@@ -4713,6 +4735,8 @@ fn start_page_content<'a>(
         [true, false, true, true] => StartLayout::WithoutVideos,
         [true, false, false, true] => StartLayout::WithoutVideosAndDiscussions,
         [true, false, false, false] => StartLayout::RecentAndWelcome,
+        // SmartCAD: combinaciones con paneles apagados por configuración.
+        [true, ..] => StartLayout::AllPanels,
         _ => StartLayout::Compact,
     };
 
@@ -5030,10 +5054,19 @@ fn start_page_content<'a>(
 
     let body: Element<'a, Message> = match start_layout {
         StartLayout::AllPanels => {
-            iced::widget::row![recent, videos_panel, welcome, discussions_panel, supporters,]
-                .spacing(16)
-                .height(Fill)
-                .into()
+            // Solo los paneles visibles (los apagados en smartcad.json no van).
+            let mut items: Vec<Element<'a, Message>> = vec![recent.into()];
+            if panel_visible[1] {
+                items.push(videos_panel);
+            }
+            items.push(welcome.into());
+            if panel_visible[2] {
+                items.push(discussions_panel);
+            }
+            if panel_visible[3] {
+                items.push(supporters);
+            }
+            Row::with_children(items).spacing(16).height(Fill).into()
         }
         StartLayout::WithoutVideos => {
             iced::widget::row![recent, welcome, discussions_panel, supporters]
@@ -5086,19 +5119,29 @@ fn start_page_content<'a>(
                     super::StartSection::Recent,
                 )
                 .into(),
-                tab_btn(crate::tr!("start", "videos"), super::StartSection::Videos).into(),
+            ]
+            .into_iter()
+            .chain(smartcad.show_videos.then(|| {
+                tab_btn(crate::tr!("start", "videos"), super::StartSection::Videos).into()
+            }))
+            .chain(std::iter::once(
                 tab_btn(crate::tr!("start", "welcome"), super::StartSection::Welcome).into(),
+            ))
+            .chain(smartcad.show_discussions.then(|| {
                 tab_btn(
                     crate::tr!("start", "discussions"),
                     super::StartSection::Discussions,
                 )
-                .into(),
+                .into()
+            }))
+            .chain(smartcad.show_supporters.then(|| {
                 tab_btn(
                     crate::tr!("start", "supporters"),
                     super::StartSection::Supporters,
                 )
-                .into(),
-            ])
+                .into()
+            }))
+            .collect::<Vec<Element<'a, Message>>>())
             .spacing(6.0)
             .align_y(iced::Center)
             .wrap()

@@ -1,0 +1,11 @@
+name = "smartcad-web"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+account_id = "f284cf099d76922cf6981a8425350f7b"
+routes = [
+  { pattern = "cad-preview.serviciosmaracaibo.com", custom_domain = true },
+]
+
+[[r2_buckets]]
+binding = "BUNDLE"
+bucket_name = "smartcad"
